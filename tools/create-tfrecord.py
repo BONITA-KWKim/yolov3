@@ -1,3 +1,18 @@
+'''
+Usage
+python tools/create-tfrecord.py train --data_dir=data/voc2012_raw/VOCdevkit/VOC2012/ \
+    --output_file=data/train.tfrecord \
+    --classes=data/voc2012.names
+
+python tools/create-tfrecord.py train --data_dir=data/voc2012_raw/VOCdevkit/VOC2012/ \
+    --output_file=data/train.tfrecord \
+    --classes=data/cervix-colpo.names
+
+python tools/create-tfrecord.py train --data_dir=data/cervix/colpo \
+    --output_file=data/train.tfrecord \
+    --classes=data/cervix-colpo.names
+'''
+
 import time
 import os
 import hashlib
@@ -14,8 +29,11 @@ flags.DEFINE_enum('split', 'train', [
     'train', 'val'], 'specify train or val spit')
 flags.DEFINE_string(
     'output_file', './data/train.tfrecord', 'output dataset')
-# flags.DEFINE_string('classes', './data/voc2012.names', 'classes file')
-flags.DEFINE_string('classes', './data/cervix-colpo.names', 'classes file')
+flags.DEFINE_string('classes', './data/voc2012.names', 'classes file')
+
+def get_bbox(coordinates):
+    xmin, ymin, xmax, ymax = 0
+    return xmin, ymin, xmax, ymax
 
 def build_example(annotation, class_map):
     img_path = os.path.join(
@@ -32,6 +50,7 @@ def build_example(annotation, class_map):
     ymax = []
     classes = []
     classes_text = []
+    '''
     if 'object' in annotation:
         for obj in annotation['object']:
             xmin.append(float(obj['bndbox']['xmin']) / width)
@@ -43,6 +62,21 @@ def build_example(annotation, class_map):
 
             classes_text.append(obj['name'].encode('utf8'))
             classes.append(class_map[obj['name']])
+    '''
+    for obj in annotation:
+        # obj['geometry']
+        # obj['geometry']['type']
+        # obj['geometry']['coordinates']
+        _xmin, _ymin, _xmax, _ymax = get_bbox(obj['geometry']['coordinates'])
+        xmin.append(_xmin)
+        ymin.append(_ymin)
+        xmax.append(_xmax)
+        ymax.append(_ymax)
+
+        classes_text.append(obj['preperties']['classification']['name'].encode('utf8'))
+        classes.append(class_map[obj['preperties']['classification']['name']])
+        
+        pass
 
     example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
@@ -76,17 +110,24 @@ def main(_argv):
     image_list = open(os.path.join(
         FLAGS.data_dir, 'ImageSets', 'Main', '%s.txt' % FLAGS.split)).read().splitlines()
     logging.info("Image list loaded: %d", len(image_list))
+
+    # information
+    logging.info("Annotation path: %s", os.path.join(FLAGS.data_dir, 'anno', name))
+
     for name in tqdm.tqdm(image_list):
         # get JSON
-        annotation = json.load(open(os.path.join(image_dir, name)))
+        # annotation = json.load(open(os.path.join(FLAGS.data_dir, 'anno', name)))
+        '''
         tf_example = build_example(
             annotation, class_map)
         writer.write(
             tf_example.SerializeToString())
         writer.close()
+        '''
+        pass
 
-
-logging.info("Done")
+    
+    logging.info("Done")
 
 
 if __name__ == '__main__':
