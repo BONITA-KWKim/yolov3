@@ -1,7 +1,7 @@
-name: yolov3-tf2-cpu
+name: yolov3-cpu
 
 dependencies:
-  - python==3.7
+  - python=3.6
   - pip
   - matplotlib
   - opencv
