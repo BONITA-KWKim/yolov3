@@ -12,9 +12,17 @@ python tools/create-tfrecord.py train --data_dir=data/cervix/colpo \
     --output_file=data/cervix-colpo-train.tfrecord \
     --classes=data/cervix-colpo.names --log_level=debug
 
-python tools/create-tfrecord.py train --data_dir=data/cervix/colpo \
-    --output_file=data/cervix-colpo-train.tfrecord \
-    --classes=data/cervix-colpo.names --log_level=info
+python tools/create-tfrecord.py --data_dir data/cervix/colpo \
+    --output_file data/cervix-colpo-train.tfrecord \
+    --classes data/cervix-colpo.names --log_level info
+
+python tools/create-tfrecord.py --data_dir data/cervix/colpo \
+    --output_file data/cervix-colpo-val.tfrecord \
+    --classes data/cervix-colpo.names --log_level info
+
+python tools/create-tfrecord.py --data_dir data/cervix/colpo \
+    --output_file data/colpo.tfrecord \
+    --classes data/cervix-colpo.names --log_level info
 '''
 
 import time
@@ -32,8 +40,6 @@ import skimage.io
 
 flags.DEFINE_string('data_dir', './data/voc2012_raw/VOCdevkit/VOC2012/',
                     'path to raw PASCAL VOC dataset')
-flags.DEFINE_enum('split', 'train', [
-    'train', 'val'], 'specify train or val spit')
 flags.DEFINE_string(
     'output_file', './data/train.tfrecord', 'output dataset')
 flags.DEFINE_string('classes', './data/voc2012.names', 'classes file')
@@ -50,11 +56,11 @@ def _get_height_width(img_path):
     return height, width
 
 
-def _get_bbox(coordinates):
-    xmin = 0
-    ymin = 0
-    xmax = 0
-    ymax = 0
+def _get_bbox(coordinates, height, width):
+    xmin = 0.0
+    ymin = 0.0
+    xmax = 0.0
+    ymax = 0.0
 
     if 0 == len(coordinates):
         logging.warning('input coordinate size is zero')
@@ -66,13 +72,13 @@ def _get_bbox(coordinates):
                 all_point_x.append(int(a[0]))
                 all_point_y.append(int(a[1]))
 
-        xmin = min(all_point_x)
-        ymin = min(all_point_y)
-        xmax = max(all_point_x)
-        ymax = max(all_point_y)
+        xmin = float(min(all_point_x) / width)
+        ymin = float(min(all_point_y) / height)
+        xmax = float(max(all_point_x) / width)
+        ymax = float(max(all_point_y) / height)
 
     # logging.log(logging.DEBUG, 'bbox: [%d %d %d %d]', xmin, ymin, xmax, ymax)
-    logging.debug('bbox: [%d %d %d %d]', xmin, ymin, xmax, ymax)
+    logging.debug('bbox: [%f %f %f %f]', xmin, ymin, xmax, ymax)
 
     return xmin, ymin, xmax, ymax
 
@@ -106,7 +112,8 @@ def build_example(annotation, path, filename, img_format, class_map):
             logging.warning("Multi-polygon type")
             return None
 
-        _xmin, _ymin, _xmax, _ymax = _get_bbox(obj['geometry']['coordinates'])
+        _xmin, _ymin, _xmax, _ymax = _get_bbox(obj['geometry']['coordinates'],
+            height, width)
         xmin.append(_xmin)
         ymin.append(_ymin)
         xmax.append(_xmax)
@@ -131,12 +138,10 @@ def build_example(annotation, path, filename, img_format, class_map):
         'image/key/sha256': tf.train.Feature(bytes_list=tf.train.BytesList(value=[key.encode('utf8')])),
         'image/encoded': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
         'image/format': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_format.encode('utf8')])),
-
         'image/object/bbox/xmin': tf.train.Feature(float_list=tf.train.FloatList(value=xmin)),
         'image/object/bbox/xmax': tf.train.Feature(float_list=tf.train.FloatList(value=xmax)),
         'image/object/bbox/ymin': tf.train.Feature(float_list=tf.train.FloatList(value=ymin)),
         'image/object/bbox/ymax': tf.train.Feature(float_list=tf.train.FloatList(value=ymax)),
-
         'image/object/class/text': tf.train.Feature(bytes_list=tf.train.BytesList(value=classes_text)),
         'image/object/class/label': tf.train.Feature(int64_list=tf.train.Int64List(value=classes)),
     }))
@@ -158,7 +163,8 @@ def main(_argv):
 
     # get IMAGE files
     base_dir = os.path.abspath("./")
-    train_dir = os.path.join(base_dir, FLAGS.data_dir, 'train')
+    # train_dir = os.path.join(base_dir, FLAGS.data_dir, 'train')
+    train_dir = os.path.join(base_dir, FLAGS.data_dir, 'val')
  
     image_list = [f for f in listdir(train_dir) 
         if f.endswith(".jpg") or f.endswith(".png")]
@@ -166,20 +172,29 @@ def main(_argv):
     logging.info("train path: %s", train_dir)
     logging.info("Image list loaded: %d", len(image_list))
     
-    # open tfrecord file
-    writer = tf.io.TFRecordWriter(FLAGS.output_file)
-    for name in tqdm.tqdm(image_list):
-        filename = os.path.splitext(name)[0]
-        img_format = os.path.splitext(name)[1]
-        json_file = filename + '.json'
+    subset = ["train", "val", "test"]
 
-        annotation = json.load(open(os.path.join(train_dir, json_file)))
-        tf_example = build_example(annotation, train_dir, filename, 
-            img_format, class_map)
-        if tf_example is not None:  
-            writer.write(tf_example.SerializeToString())
+    out_name = os.path.splitext(FLAGS.output_file)[0]
+    out_format = os.path.splitext(FLAGS.output_file)[1]
 
-    writer.close()
+    for item in subset:
+        result_name = "{}-{}{}".format(out_name, item, out_format)
+        logging.info("output file: %s", result_name)
+        # open tfrecord file
+        writer = tf.io.TFRecordWriter(result_name)
+        for name in tqdm.tqdm(image_list):
+            filename = os.path.splitext(name)[0]
+            img_format = os.path.splitext(name)[1]
+            json_file = filename + '.json'
+
+            annotation = json.load(open(os.path.join(train_dir, json_file)))
+            tf_example = build_example(annotation, train_dir, filename, 
+                img_format, class_map)
+            if tf_example is not None:  
+                writer.write(tf_example.SerializeToString())
+
+        writer.close()
+
     logging.info("===== Done =====")
 
     ## report??
