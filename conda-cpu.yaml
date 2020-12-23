@@ -1,12 +1,11 @@
 name: yolov3-cpu
 
 dependencies:
-  - python=3.6
+  - python=3.7
   - pip
   - matplotlib
   - opencv
   - pip:
-    - tensorflow==2.1.0rc1
+    - tensorflow==2.2.0
     - lxml
     - tqdm
-    - -e .

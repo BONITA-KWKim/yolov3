@@ -82,7 +82,84 @@ def _get_bbox(coordinates, height, width):
 
     return xmin, ymin, xmax, ymax
 
+def build_example(type_, annotation, path, filename, img_format, class_map):
+    logging.debug('type: {}'.format(type_))
+    assert type_ in ["train", "val", "test"]
 
+    if img_format not in [".jpg", ".jpeg", ".png"]:
+        logging.warning("image(%s) is not supperted format(%s)",
+            filename, img_format)
+        return None
+
+    filename += img_format
+    img_path = os.path.join(path, filename)
+
+    img_raw = open(img_path, 'rb').read()
+    key = hashlib.sha256(img_raw).hexdigest()
+
+    height, width = _get_height_width(img_path)
+
+    xmin = []
+    ymin = []
+    xmax = []
+    ymax = []
+    classes = []
+    classes_text = []
+    if "test" == type_:
+        example = tf.train.Example(features=tf.train.Features(feature={
+            'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
+            'image/width': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
+            'image/filename': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+                filename.encode('utf8')])),
+            'image/source_id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+                filename.encode('utf8')])),
+            'image/key/sha256': tf.train.Feature(bytes_list=tf.train.BytesList(value=[key.encode('utf8')])),
+            'image/encoded': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
+            'image/format': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_format.encode('utf8')])),
+        }))
+    else:
+        for obj in annotation:
+            if 'MultiPolygon' == obj['geometry']['type']:
+                logging.warning("Multi-polygon type")
+                return None
+
+            _xmin, _ymin, _xmax, _ymax = _get_bbox(obj['geometry']['coordinates'],
+                height, width)
+            xmin.append(_xmin)
+            ymin.append(_ymin)
+            xmax.append(_xmax)
+            ymax.append(_ymax)
+
+            if 'classification' in obj['properties']:
+                classes_text.append(obj['properties']['classification']['name']
+                        .encode('utf8'))
+                classes.append(
+                    class_map[obj['properties']['classification']['name']])
+            else:
+                classes_text.append(str('UNKNOWN').encode('utf8'))
+                classes.append(class_map['UNKNOWN'])
+
+        example = tf.train.Example(features=tf.train.Features(feature={
+            'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
+            'image/width': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
+            'image/filename': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+                filename.encode('utf8')])),
+            'image/source_id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[
+                filename.encode('utf8')])),
+            'image/key/sha256': tf.train.Feature(bytes_list=tf.train.BytesList(value=[key.encode('utf8')])),
+            'image/encoded': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
+            'image/format': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_format.encode('utf8')])),
+            'image/object/bbox/xmin': tf.train.Feature(float_list=tf.train.FloatList(value=xmin)),
+            'image/object/bbox/xmax': tf.train.Feature(float_list=tf.train.FloatList(value=xmax)),
+            'image/object/bbox/ymin': tf.train.Feature(float_list=tf.train.FloatList(value=ymin)),
+            'image/object/bbox/ymax': tf.train.Feature(float_list=tf.train.FloatList(value=ymax)),
+            'image/object/class/text': tf.train.Feature(bytes_list=tf.train.BytesList(value=classes_text)),
+            'image/object/class/label': tf.train.Feature(int64_list=tf.train.Int64List(value=classes)),
+        })) 
+
+    return example
+
+'''
 def build_example(annotation, path, filename, img_format, class_map):
     if img_format not in [".jpg", ".jpeg", ".png"]:
         logging.warning("image(%s) is not supperted format(%s)",
@@ -147,6 +224,8 @@ def build_example(annotation, path, filename, img_format, class_map):
     }))
 
     return example
+'''
+
 
 def main(_argv):
     logging.info("===== Start create tfrecord =====")
@@ -183,12 +262,16 @@ def main(_argv):
         # open tfrecord file
         writer = tf.io.TFRecordWriter(result_name)
         for name in tqdm.tqdm(image_list):
-            filename = os.path.splitext(name)[0]
-            img_format = os.path.splitext(name)[1]
-            json_file = filename + '.json'
+            if "type" == name:
+                pass
+            else:
+                filename = os.path.splitext(name)[0]
+                img_format = os.path.splitext(name)[1]
+                json_file = filename + '.json'
 
-            annotation = json.load(open(os.path.join(train_dir, json_file)))
-            tf_example = build_example(annotation, train_dir, filename, 
+                annotation = json.load(open(os.path.join(train_dir, json_file)))
+
+            tf_example = build_example(item, annotation, train_dir, filename, 
                 img_format, class_map)
             if tf_example is not None:  
                 writer.write(tf_example.SerializeToString())

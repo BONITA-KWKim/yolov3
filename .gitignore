@@ -142,5 +142,6 @@ dmypy.json
 data/cervix/
 .DS_Store
 tmp*
+output/
 
 # End of https://www.gitignore.io/api/python

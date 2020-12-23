@@ -86,8 +86,6 @@ def main(_argv):
         anchors = yolo_anchors
         anchor_masks = yolo_anchor_masks
 
-    exit(0)
-
     # load Dataset
     ## train dataset
     if FLAGS.dataset:

@@ -12,6 +12,11 @@ python3 detect.py --classes ./data/cervix-colpo.names \
 --image ./data/cervix/colpo/C_C0032_SS_NIA11_032_L.png \
 --tiny --weights ./checkpoints/yolov3_train_2.tf \
 --output ./output.jpg --num_classes 5
+
+python3 detect.py --classes ./data/cervix-colpo.names \
+--tfrecord ./data/colpo-test.tfrecord \
+--notiny --weights ./checkpoints/yolov3_train_2.tf \
+--output ./output.jpg --num_classes 5
 '''
 
 import time
@@ -35,9 +40,18 @@ flags.DEFINE_string('image', './data/girl.png', 'path to input image')
 flags.DEFINE_string('tfrecord', None, 'tfrecord instead of image')
 flags.DEFINE_string('output', './output.jpg', 'path to output image')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+flags.DEFINE_enum('log_level', 'info', [
+    'info', 'debug'], 'log_level mode; debug/info')
 
 
 def main(_argv):
+    # log level
+    logging.debug("FLAGS.log_level: {}".format(FLAGS.log_level))
+    if 'debug' == FLAGS.log_level:
+        logging.set_verbosity(logging.DEBUG)
+    else:
+        logging.set_verbosity(logging.INFO)
+
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     for physical_device in physical_devices:
         tf.config.experimental.set_memory_growth(physical_device, True)
@@ -53,8 +67,12 @@ def main(_argv):
     class_names = [c.strip() for c in open(FLAGS.classes).readlines()]
     logging.info('classes loaded')
 
+    '''
+    dataset.take(count)
+      - take count elements from dataset 
+    '''
     if FLAGS.tfrecord:
-        logging.debug('tfrecord is None {}'.format(FLAGS.tfrecord))
+        logging.debug('tfrecord is {}'.format(FLAGS.tfrecord))
         dataset = load_tfrecord_dataset(
             FLAGS.tfrecord, FLAGS.classes, FLAGS.size)
         dataset = dataset.shuffle(512)
@@ -71,7 +89,10 @@ def main(_argv):
     t2 = time.time()
     logging.info('time: {}'.format(t2 - t1))
 
-    logging.info('detections:')
+    logging.debug('===== VC =====')
+    logging.debug('nums. size: {}, raw: {}'.format(len(nums), nums))
+    logging.debug('classes. size: {}, raw: {}'.format(len(classes), classes))
+
     for i in range(nums[0]):
         logging.info('\t{}, {}, {}'.format(class_names[int(classes[0][i])],
                                            np.array(scores[0][i]),
