@@ -242,15 +242,6 @@ def main(_argv):
 
     # get IMAGE files
     base_dir = os.path.abspath("./")
-    # train_dir = os.path.join(base_dir, FLAGS.data_dir, 'train')
-    train_dir = os.path.join(base_dir, FLAGS.data_dir, 'val')
- 
-    image_list = [f for f in listdir(train_dir) 
-        if f.endswith(".jpg") or f.endswith(".png")]
-
-    logging.info("train path: %s", train_dir)
-    logging.info("Image list loaded: %d", len(image_list))
-    
     subset = ["train", "val", "test"]
 
     out_name = os.path.splitext(FLAGS.output_file)[0]
@@ -261,17 +252,25 @@ def main(_argv):
         logging.info("output file: %s", result_name)
         # open tfrecord file
         writer = tf.io.TFRecordWriter(result_name)
-        for name in tqdm.tqdm(image_list):
-            if "type" == name:
-                pass
+
+        dataset_dir = os.path.join(base_dir, FLAGS.data_dir, item)
+        logging.info("dataset path: %s", dataset_dir)
+
+        dataset_list = [f for f in listdir(dataset_dir)
+            if f.endswith(".jpg") or f.endswith(".png")]
+        logging.info("Image list loaded: %d", len(dataset_list))
+        logging.debug("Image list loaded: {}".format(dataset_list))
+        
+        for name in tqdm.tqdm(dataset_list):
+            filename = os.path.splitext(name)[0]
+            img_format = os.path.splitext(name)[1]
+
+            if "test" == item:
+                annotation = None
             else:
-                filename = os.path.splitext(name)[0]
-                img_format = os.path.splitext(name)[1]
-                json_file = filename + '.json'
+                annotation = json.load(open(os.path.join(dataset_dir, (filename+'.json'))))
 
-                annotation = json.load(open(os.path.join(train_dir, json_file)))
-
-            tf_example = build_example(item, annotation, train_dir, filename, 
+            tf_example = build_example(item, annotation, dataset_dir, filename,
                 img_format, class_map)
             if tf_example is not None:  
                 writer.write(tf_example.SerializeToString())
