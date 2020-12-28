@@ -108,6 +108,9 @@ def main(_argv):
             FLAGS.tfrecord, FLAGS.classes, FLAGS.size)
         dataset = dataset.shuffle(512)
 
+        if not os.path.exists(FLAGS.output):
+            os.makedirs(FLAGS.output)
+
         for step, (img_raw, _label) in enumerate(dataset):
             # detect
             logging.info("step: {}".format(step))
