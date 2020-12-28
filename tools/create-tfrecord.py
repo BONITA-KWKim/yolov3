@@ -1,24 +1,9 @@
 '''
 Usage
+
 python tools/create-tfrecord.py train --data_dir=data/voc2012_raw/VOCdevkit/VOC2012/ \
     --output_file=data/train.tfrecord \
     --classes=data/voc2012.names
-
-python tools/create-tfrecord.py train --data_dir=data/voc2012_raw/VOCdevkit/VOC2012/ \
-    --output_file=data/train.tfrecord \
-    --classes=data/cervix-colpo.names
-
-python tools/create-tfrecord.py train --data_dir=data/cervix/colpo \
-    --output_file=data/cervix-colpo-train.tfrecord \
-    --classes=data/cervix-colpo.names --log_level=debug
-
-python tools/create-tfrecord.py --data_dir data/cervix/colpo \
-    --output_file data/cervix-colpo-train.tfrecord \
-    --classes data/cervix-colpo.names --log_level info
-
-python tools/create-tfrecord.py --data_dir data/cervix/colpo \
-    --output_file data/cervix-colpo-val.tfrecord \
-    --classes data/cervix-colpo.names --log_level info
 
 python tools/create-tfrecord.py --data_dir data/cervix/colpo \
     --output_file data/colpo.tfrecord \
@@ -77,10 +62,10 @@ def _get_bbox(coordinates, height, width):
         xmax = float(max(all_point_x) / width)
         ymax = float(max(all_point_y) / height)
 
-    # logging.log(logging.DEBUG, 'bbox: [%d %d %d %d]', xmin, ymin, xmax, ymax)
     logging.debug('bbox: [%f %f %f %f]', xmin, ymin, xmax, ymax)
 
     return xmin, ymin, xmax, ymax
+
 
 def build_example(type_, annotation, path, filename, img_format, class_map):
     logging.debug('type: {}'.format(type_))
